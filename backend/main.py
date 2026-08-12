@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from supabase import create_client, Client
 from passlib.context import CryptContext
 from dotenv import load_dotenv
+from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
@@ -214,6 +215,20 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Internal Email System API", lifespan=lifespan)
 
+origins = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "https://superwiseemails.site",
+    "https://www.superwiseemails.site",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],  # The "*" is mandatory! It allows the OPTIONS method to pass.
+    allow_headers=["*"],
+)
 
 # --- Authentication Endpoints ---
 @app.post("/api/login")
