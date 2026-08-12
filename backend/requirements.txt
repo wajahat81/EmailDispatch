@@ -1,5 +1,7 @@
 fastapi
-uvicorn
+uvicorn[standard]
 supabase
-pydantic
+passlib[bcrypt]
+bcrypt==3.2.2
+pyjwt
 python-dotenv

@@ -18,7 +18,7 @@ export default function Login({ setAuth }) {
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
-
+      
       if (res.ok) {
         localStorage.setItem('token', data.access_token);
         localStorage.setItem('user', JSON.stringify(data.user));
@@ -36,15 +36,13 @@ export default function Login({ setAuth }) {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 via-white to-blue-100 font-sans">
       <div className="max-w-sm w-full bg-white/80 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-blue-100 p-8 transition-all">
-
-        {/* Logo Placeholder */}
+        
         <div className="flex justify-center mb-6">
-          <img
-            src="/logo.png"
-            alt="Company Logo"
+          <img 
+            src="/logo.png" 
+            alt="Company Logo" 
             className="h-12 w-auto object-contain"
             onError={(e) => {
-              // Fallback if logo.png is missing
               e.target.style.display = 'none';
               e.target.insertAdjacentHTML('afterend', '<div class="h-12 w-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 font-bold text-xl">L</div>');
             }}
@@ -52,8 +50,8 @@ export default function Login({ setAuth }) {
         </div>
 
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Welcome back</h1>
-          <p className="text-sm text-slate-500 mt-2">Enter your credentials to access the system</p>
+          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Prime Kindom Pvt. Ltd..</h1>
+          <p className="text-sm text-slate-500 mt-2">Please Enter your credentials</p>
         </div>
 
         {error && (
@@ -73,7 +71,7 @@ export default function Login({ setAuth }) {
                 className="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white transition-all duration-200"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@company.com"
+                placeholder="Enter your email"
               />
             </div>
           </div>
