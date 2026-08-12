@@ -39,9 +39,9 @@ export default function Login({ setAuth }) {
         
         <div className="flex justify-center mb-6">
           <img 
-            src="/logo.png" 
-            alt="Company Logo" 
-            className="h-12 w-auto object-contain"
+  src="/logo.png" 
+  alt="Superwise Logo" 
+  className="h-24 w-auto mx-auto mb-1" 
             onError={(e) => {
               e.target.style.display = 'none';
               e.target.insertAdjacentHTML('afterend', '<div class="h-12 w-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 font-bold text-xl">L</div>');
@@ -50,7 +50,9 @@ export default function Login({ setAuth }) {
         </div>
 
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Prime Kindom Pvt. Ltd..</h1>
+          <h2 className="text-2xl font-bold text-center mt-0">
+  Superwise Telecoms
+</h2>
           <p className="text-sm text-slate-500 mt-2">Please Enter your credentials</p>
         </div>
 
