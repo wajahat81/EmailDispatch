@@ -1,5 +1,5 @@
 import os
-import smtplib
+import resend
 import jwt
 import imaplib
 import email
@@ -7,8 +7,6 @@ from email.header import decode_header
 import re
 import asyncio
 from datetime import datetime, timedelta
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from typing import Optional
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Header, Depends, BackgroundTasks
@@ -23,16 +21,22 @@ load_dotenv()
 # --- Environment Variables ---
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-SENDER_EMAIL = "wajibhai239@gmail.com"
-RECEIVER_EMAIL = "wajahathaider12345@gmail.com"
-SMTP_USER = "wajibhai239@gmail.com"
-SMTP_PASSWORD = "ffshrxzfjzkmnwdq"
-JWT_SECRET = os.getenv("JWT_SECRET", "68e0002a-f9db-48f6-8f91-daaf5ca8afa5")
+JWT_SECRET = os.getenv("JWT_SECRET")  # no hardcoded fallback in production
 
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
-SMTP_USER = os.getenv("SMTP_USER")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+if not JWT_SECRET:
+    raise RuntimeError("JWT_SECRET environment variable is not set")
+
+# --- Resend (outbound sending) ---
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+resend.api_key = RESEND_API_KEY
+
+FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@superwiseemails.site")
+RECEIVER_EMAIL = os.getenv("RECEIVER_EMAIL", "wajahathaider12345@gmail.com")
+
+# --- Gmail IMAP (inbound reply tracking only — NOT used for sending anymore) ---
+IMAP_HOST = os.getenv("IMAP_HOST", "imap.gmail.com")
+IMAP_USER = os.getenv("IMAP_USER")       # your Gmail address, e.g. wajibhai239@gmail.com
+IMAP_PASSWORD = os.getenv("IMAP_PASSWORD")  # Gmail App Password (rotate the one that leaked!)
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -56,7 +60,7 @@ class EditUserRequest(BaseModel):
     name: str
     email: str
     role: str
-    password: Optional[str] = None # Optional password change
+    password: Optional[str] = None  # Optional password change
 
 # --- Helper Functions ---
 def verify_password(plain_password, hashed_password):
@@ -78,24 +82,28 @@ def get_current_user(authorization: Optional[str] = Header(None)):
         raise HTTPException(status_code=401, detail="Invalid token")
 
 def dispatch_actual_email(sender: str, receiver: str, subject: str, body: str, log_id: str):
-    msg = MIMEMultipart()
-    msg['From'] = sender
-    msg['To'] = receiver
-    msg['Subject'] = subject
-    
-    sender_name, domain = sender.split('@')
-    reply_to_email = f"{sender_name}+{log_id}@{domain}"
-    msg.add_header('Reply-To', reply_to_email)
+    """
+    Sends via Resend's API instead of raw SMTP.
+    Reply-To still points to the Gmail inbox so the IMAP poller
+    can catch replies and match them back to this log_id.
+    """
+    if not IMAP_USER:
+        print("IMAP_USER not set — replies won't be trackable via Reply-To")
+        reply_to_email = sender
+    else:
+        imap_name, imap_domain = IMAP_USER.split('@')
+        reply_to_email = f"{imap_name}+{log_id}@{imap_domain}"
 
-    msg.attach(MIMEText(body, 'plain'))
     try:
-        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT)
-        server.starttls()
-        server.login(SMTP_USER, SMTP_PASSWORD)
-        server.send_message(msg)
-        server.quit()
+        resend.Emails.send({
+            "from": sender,
+            "to": [receiver],
+            "subject": subject,
+            "text": body,
+            "reply_to": reply_to_email,
+        })
     except Exception as e:
-        print(f"SMTP Failed: {str(e)}")
+        print(f"Resend send failed: {str(e)}")
 
 def clean_email_body(raw_body):
     body = raw_body.replace('\r', '')
@@ -106,20 +114,20 @@ def clean_email_body(raw_body):
 
     parts = body.split("---SPLIT---")
     new_reply = parts[0].strip()
-    
+
     new_reply_lines = []
     for line in new_reply.split('\n'):
         line = line.lstrip('> ').strip()
         line = re.sub(r"\[Replied to:.*?\]", "", line).strip()
         if line:
             new_reply_lines.append(line)
-            
+
     new_reply = "\n".join(new_reply_lines)
-    
+
     replied_to = ""
     if len(parts) > 1:
         original_text = parts[1]
-        
+
         clean_lines = []
         for line in original_text.split('\n'):
             line = line.lstrip('> ').strip()
@@ -128,15 +136,15 @@ def clean_email_body(raw_body):
             line = re.sub(r"\[Replied to:.*?\]", "", line).strip()
             if line:
                 clean_lines.append(line)
-        
+
         if clean_lines:
             quoted_text = " ".join(clean_lines)
             quoted_text = re.sub(r'\s+', ' ', quoted_text).strip()
             replied_to = quoted_text[:100] + ("..." if len(quoted_text) > 100 else "")
-            
+
     if replied_to:
         return f"{new_reply}\n\n[Replied to: {replied_to}]"
-        
+
     return new_reply
 
 def extract_body(msg):
@@ -152,18 +160,21 @@ def extract_body(msg):
     return ""
 
 
-# --- Automated Background Sync Logic ---
+# --- Automated Background Sync Logic (Gmail IMAP — unaffected by the sending fix) ---
 def sync_imap_emails():
+    if not IMAP_USER or not IMAP_PASSWORD:
+        print("IMAP credentials not set — skipping reply sync")
+        return
     try:
-        mail = imaplib.IMAP4_SSL("imap.gmail.com")
-        mail.login(SMTP_USER, SMTP_PASSWORD)
+        mail = imaplib.IMAP4_SSL(IMAP_HOST)
+        mail.login(IMAP_USER, IMAP_PASSWORD)
         mail.select("inbox")
 
         status, messages = mail.search(None, '(UNSEEN)')
         if not messages[0]:
             mail.logout()
             return
-            
+
         email_ids = messages[0].split()
 
         for e_id in email_ids:
@@ -171,10 +182,10 @@ def sync_imap_emails():
             for response_part in msg_data:
                 if isinstance(response_part, tuple):
                     msg = email.message_from_bytes(response_part[1])
-                    
+
                     to_header = str(msg.get("To", ""))
                     match = re.search(r"\+([a-f0-9\-]+)@", to_header)
-                    
+
                     if not match:
                         subject, encoding = decode_header(msg.get("Subject", ""))[0]
                         if isinstance(subject, bytes):
@@ -187,10 +198,10 @@ def sync_imap_emails():
                         clean_body = clean_email_body(raw_body)
 
                         current_log_res = supabase.table("email_logs").select("response_text").eq("id", log_id).execute()
-                        
+
                         if current_log_res.data:
                             existing_history = current_log_res.data[0].get("response_text") or ""
-                            
+
                             if existing_history:
                                 combined_response = f"{clean_body}\n\n━━━━━━━━━━━━━━━━━━━━\n\n{existing_history}"
                             else:
@@ -211,9 +222,9 @@ async def email_sync_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    #task = asyncio.create_task(email_sync_loop())
+    task = asyncio.create_task(email_sync_loop())
     yield
-    #task.cancel()
+    task.cancel()
 
 app = FastAPI(title="Internal Email System API", lifespan=lifespan)
 
@@ -228,7 +239,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],  # The "*" is mandatory! It allows the OPTIONS method to pass.
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -238,7 +249,7 @@ async def login(credentials: LoginRequest):
     response = supabase.table("profiles").select("*").eq("email", credentials.email).execute()
     if not response.data:
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    
+
     user = response.data[0]
 
     if not verify_password(credentials.password, user["password"]):
@@ -252,7 +263,7 @@ async def login(credentials: LoginRequest):
         "exp": datetime.utcnow() + timedelta(hours=24)
     }
     token = jwt.encode(token_data, JWT_SECRET, algorithm="HS256")
-    
+
     return {
         "access_token": token,
         "user": {"id": user["id"], "name": user["name"], "email": user["email"], "role": user["role"]}
@@ -266,7 +277,7 @@ async def get_emails(user: dict = Depends(get_current_user)):
     if user["role"] == "employee":
         query = query.eq("user_id", user["id"])
     response = query.order("created_at", desc=True).execute()
-    
+
     formatted_data = []
     for log in response.data:
         log["sender_name"] = log["profiles"]["name"]
@@ -276,13 +287,13 @@ async def get_emails(user: dict = Depends(get_current_user)):
 
 @app.post("/api/emails/send")
 async def send_email(
-    payload: EmailSendRequest, 
-    background_tasks: BackgroundTasks, 
+    payload: EmailSendRequest,
+    background_tasks: BackgroundTasks,
     user: dict = Depends(get_current_user)
 ):
     log_data = {
         "user_id": user["id"],
-        "sender_email": SENDER_EMAIL,
+        "sender_email": FROM_EMAIL,
         "receiver_email": RECEIVER_EMAIL,
         "title": payload.title,
         "comments": payload.comments
@@ -292,11 +303,11 @@ async def send_email(
 
     background_tasks.add_task(
         dispatch_actual_email,
-        sender=SENDER_EMAIL,
+        sender=FROM_EMAIL,
         receiver=RECEIVER_EMAIL,
         subject=payload.title,
-        body=payload.comments, 
-        log_id=log_id          
+        body=payload.comments,
+        log_id=log_id
     )
     return {"status": "success"}
 
@@ -326,7 +337,7 @@ async def create_new_user(payload: CreateUserRequest, current_user: dict = Depen
 @app.put("/api/admin/users/{user_id}")
 async def edit_user(user_id: str, payload: EditUserRequest, current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "admin": raise HTTPException(status_code=403, detail="Admins only.")
-    
+
     update_data = {"name": payload.name, "email": payload.email, "role": payload.role}
     if payload.password:
         update_data["password"] = get_password_hash(payload.password)
@@ -341,6 +352,6 @@ async def edit_user(user_id: str, payload: EditUserRequest, current_user: dict =
 async def delete_user(user_id: str, current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "admin": raise HTTPException(status_code=403, detail="Admins only.")
     if current_user["id"] == user_id: raise HTTPException(status_code=400, detail="You cannot delete your own admin account.")
-    
+
     supabase.table("profiles").delete().eq("id", user_id).execute()
     return {"message": "User deleted successfully"}
