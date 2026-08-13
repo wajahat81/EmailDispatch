@@ -278,7 +278,13 @@ async def lifespan(app: FastAPI):
     yield
     task.cancel()
 
-app = FastAPI(title="Internal Email System API", lifespan=lifespan)
+app = FastAPI(
+    title="Internal Email System API", 
+    lifespan=lifespan,
+    docs_url=None,    # Disables the default unprotected /docs
+    redoc_url=None,   
+    openapi_url=None  # Disables the default unprotected openapi schema
+)
 
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
