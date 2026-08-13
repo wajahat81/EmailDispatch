@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Mail, Lock } from 'lucide-react';
+import ForgotPassword from './ForgotPassword';
 
 export default function Login({ setAuth }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [view, setView] = useState('login'); // 'login' | 'forgot'
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -37,6 +39,10 @@ export default function Login({ setAuth }) {
       setLoading(false);
     }
   };
+
+  if (view === 'forgot') {
+    return <ForgotPassword onBack={() => setView('login')} />;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 via-white to-blue-100 font-sans">
@@ -83,7 +89,16 @@ export default function Login({ setAuth }) {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-sm font-medium text-slate-700">Password</label>
+              <button
+                type="button"
+                onClick={() => setView('forgot')}
+                className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline"
+              >
+                Forgot password?
+              </button>
+            </div>
             <div className="relative group">
               <Lock className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
               <input

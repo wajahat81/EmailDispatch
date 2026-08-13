@@ -3,6 +3,8 @@ import resend
 import jwt
 import imaplib
 import email
+import random
+import secrets
 from email.header import decode_header
 import re
 import asyncio
@@ -21,7 +23,7 @@ load_dotenv()
 # --- Environment Variables ---
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-JWT_SECRET = os.getenv("JWT_SECRET")  # no hardcoded fallback in production
+JWT_SECRET = os.getenv("JWT_SECRET")
 
 if not JWT_SECRET:
     raise RuntimeError("JWT_SECRET environment variable is not set")
@@ -31,12 +33,15 @@ RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 resend.api_key = RESEND_API_KEY
 
 FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@superwiseemails.site")
+OTP_FROM_EMAIL = os.getenv("OTP_FROM_EMAIL", FROM_EMAIL)  # falls back to FROM_EMAIL if not set
 RECEIVER_EMAIL = os.getenv("RECEIVER_EMAIL", "wajahathaider12345@gmail.com")
 
 # --- Gmail IMAP (inbound reply tracking only — NOT used for sending anymore) ---
 IMAP_HOST = os.getenv("IMAP_HOST", "imap.gmail.com")
-IMAP_USER = os.getenv("IMAP_USER")       # your Gmail address, e.g. wajibhai239@gmail.com
-IMAP_PASSWORD = os.getenv("IMAP_PASSWORD")  # Gmail App Password (rotate the one that leaked!)
+IMAP_USER = os.getenv("IMAP_USER")
+IMAP_PASSWORD = os.getenv("IMAP_PASSWORD")
+
+OTP_EXPIRY_MINUTES = 10
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -60,7 +65,19 @@ class EditUserRequest(BaseModel):
     name: str
     email: str
     role: str
-    password: Optional[str] = None  # Optional password change
+    password: Optional[str] = None
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ResetPasswordRequest(BaseModel):
+    email: str
+    otp: str
+    new_password: str
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
 
 # --- Helper Functions ---
 def verify_password(plain_password, hashed_password):
@@ -81,12 +98,32 @@ def get_current_user(authorization: Optional[str] = Header(None)):
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+def generate_otp() -> str:
+    return f"{secrets.randbelow(1000000):06d}"
+
+def send_otp_email(to_email: str, otp: str):
+    try:
+        resend.Emails.send({
+            "from": OTP_FROM_EMAIL,
+            "to": [to_email],
+            "subject": "Your password reset code",
+            "html": f"""
+                <div style="font-family: sans-serif; max-width: 480px; margin: auto;">
+                    <h2>Password Reset Request</h2>
+                    <p>Use the code below to reset your password. This code expires in {OTP_EXPIRY_MINUTES} minutes.</p>
+                    <div style="font-size: 32px; font-weight: bold; letter-spacing: 8px; background: #f1f5f9; padding: 16px; text-align: center; border-radius: 12px; margin: 20px 0;">
+                        {otp}
+                    </div>
+                    <p style="color: #64748b; font-size: 13px;">If you didn't request this, you can safely ignore this email.</p>
+                </div>
+            """,
+        })
+        return True
+    except Exception as e:
+        print(f"Failed to send OTP email: {e}")
+        return False
+
 def dispatch_actual_email(sender: str, receiver: str, subject: str, body: str, log_id: str):
-    """
-    Sends via Resend's API instead of raw SMTP.
-    Reply-To still points to the Gmail inbox so the IMAP poller
-    can catch replies and match them back to this log_id.
-    """
     if not IMAP_USER:
         print("IMAP_USER not set — replies won't be trackable via Reply-To")
         reply_to_email = sender
@@ -160,7 +197,7 @@ def extract_body(msg):
     return ""
 
 
-# --- Automated Background Sync Logic (Gmail IMAP — unaffected by the sending fix) ---
+# --- Automated Background Sync Logic (Gmail IMAP) ---
 def sync_imap_emails():
     if not IMAP_USER or not IMAP_PASSWORD:
         print("IMAP credentials not set — skipping reply sync")
@@ -268,6 +305,82 @@ async def login(credentials: LoginRequest):
         "access_token": token,
         "user": {"id": user["id"], "name": user["name"], "email": user["email"], "role": user["role"]}
     }
+
+
+@app.post("/api/forgot-password")
+async def forgot_password(payload: ForgotPasswordRequest, background_tasks: BackgroundTasks):
+    # Always return the same generic response, whether or not the email exists —
+    # this prevents attackers from using this endpoint to discover valid accounts.
+    generic_response = {"message": "If an account with that email exists, a reset code has been sent."}
+
+    user_res = supabase.table("profiles").select("id, email").eq("email", payload.email).execute()
+    if not user_res.data:
+        return generic_response
+
+    otp = generate_otp()
+    otp_hash = get_password_hash(otp)
+    expires_at = (datetime.utcnow() + timedelta(minutes=OTP_EXPIRY_MINUTES)).isoformat()
+
+    supabase.table("password_resets").insert({
+        "email": payload.email,
+        "otp_hash": otp_hash,
+        "expires_at": expires_at,
+        "used": False
+    }).execute()
+
+    background_tasks.add_task(send_otp_email, payload.email, otp)
+
+    return generic_response
+
+
+@app.post("/api/reset-password")
+async def reset_password(payload: ResetPasswordRequest):
+    # Get the most recent, unused OTP for this email
+    res = supabase.table("password_resets") \
+        .select("*") \
+        .eq("email", payload.email) \
+        .eq("used", False) \
+        .order("created_at", desc=True) \
+        .limit(1) \
+        .execute()
+
+    if not res.data:
+        raise HTTPException(status_code=400, detail="Invalid or expired code")
+
+    record = res.data[0]
+
+    expires_at = datetime.fromisoformat(record["expires_at"])
+    if datetime.utcnow() > expires_at.replace(tzinfo=None):
+        raise HTTPException(status_code=400, detail="Code has expired. Please request a new one.")
+
+    if not pwd_context.verify(payload.otp, record["otp_hash"]):
+        raise HTTPException(status_code=400, detail="Invalid code")
+
+    # Mark OTP as used
+    supabase.table("password_resets").update({"used": True}).eq("id", record["id"]).execute()
+
+    # Update the user's password
+    new_hash = get_password_hash(payload.new_password)
+    supabase.table("profiles").update({"password": new_hash}).eq("email", payload.email).execute()
+
+    return {"message": "Password reset successfully"}
+
+
+@app.put("/api/change-password")
+async def change_password(payload: ChangePasswordRequest, current_user: dict = Depends(get_current_user)):
+    user_res = supabase.table("profiles").select("*").eq("id", current_user["id"]).execute()
+    if not user_res.data:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user = user_res.data[0]
+
+    if not verify_password(payload.current_password, user["password"]):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+
+    new_hash = get_password_hash(payload.new_password)
+    supabase.table("profiles").update({"password": new_hash}).eq("id", current_user["id"]).execute()
+
+    return {"message": "Password changed successfully"}
 
 
 # --- Email Endpoints ---

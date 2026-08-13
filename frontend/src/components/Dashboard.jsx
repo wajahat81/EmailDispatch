@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { LogOut, Plus, ShieldCheck, User as UserIcon, MessageSquare, UserPlus, Edit2, Trash2, Search, Calendar, XCircle } from 'lucide-react';
+import { LogOut, Plus, ShieldCheck, User as UserIcon, MessageSquare, UserPlus, Edit2, Trash2, Search, Calendar, XCircle, KeyRound } from 'lucide-react';
 import EmailModal from './EmailModal';
 import AddUserModal from './AddUserModal';
 import EditUserModal from './EditUserModal';
 import ConfirmModal from './ConfirmModal';
+import ChangePasswordModal from './ChangePasswordModal';
 
 export default function Dashboard({ auth, setAuth }) {
   const { user, access_token } = auth;
@@ -17,6 +18,7 @@ export default function Dashboard({ auth, setAuth }) {
   
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null); 
 
@@ -123,6 +125,13 @@ export default function Dashboard({ auth, setAuth }) {
                 <div className="text-sm font-semibold text-slate-800">{user.name}</div>
                 <div className="text-[11px] text-slate-400 capitalize">{user.role}</div>
               </div>
+              <button
+                onClick={() => setIsChangePasswordOpen(true)}
+                className="ml-1 p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                title="Change Password"
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+              </button>
             </div>
 
             <div className="h-6 w-px bg-slate-200 hidden sm:block"></div>
@@ -320,6 +329,10 @@ export default function Dashboard({ auth, setAuth }) {
 
       {editingUser && (
         <EditUserModal token={access_token} userToEdit={editingUser} onClose={() => setEditingUser(null)} setConfirmAction={setConfirmAction} onSuccess={() => { setEditingUser(null); setConfirmAction(null); fetchUsers(); }} />
+      )}
+
+      {isChangePasswordOpen && (
+        <ChangePasswordModal token={access_token} onClose={() => setIsChangePasswordOpen(false)} />
       )}
 
       {confirmAction && (
