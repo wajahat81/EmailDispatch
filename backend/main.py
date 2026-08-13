@@ -8,6 +8,7 @@ import secrets
 from email.header import decode_header
 import re
 import asyncio
+import logging
 from datetime import datetime, timedelta
 from typing import Optional
 from contextlib import asynccontextmanager
@@ -17,27 +18,37 @@ from supabase import create_client, Client
 from passlib.context import CryptContext
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Request
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
 
 load_dotenv()
 
-# --- Environment Variables ---
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-JWT_SECRET = os.getenv("JWT_SECRET")
+# --- 1. Structured Logging Setup ---
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logger = logging.getLogger(__name__)
 
-if not JWT_SECRET:
-    raise RuntimeError("JWT_SECRET environment variable is not set")
+# --- 2. Zero-Fallback Secrets Management ---
+def get_env_or_fail(var_name: str) -> str:
+    value = os.getenv(var_name)
+    if not value:
+        raise RuntimeError(f"CRITICAL ERROR: {var_name} environment variable is not set. Halting server.")
+    return value
 
-# --- Resend (outbound sending) ---
-RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+# Enforce strict existence of all critical variables
+SUPABASE_URL = get_env_or_fail("SUPABASE_URL")
+SUPABASE_KEY = get_env_or_fail("SUPABASE_KEY")
+JWT_SECRET = get_env_or_fail("JWT_SECRET")
+RESEND_API_KEY = get_env_or_fail("RESEND_API_KEY")
+FROM_EMAIL = get_env_or_fail("FROM_EMAIL")
+RECEIVER_EMAIL = get_env_or_fail("RECEIVER_EMAIL")
+
 resend.api_key = RESEND_API_KEY
+OTP_FROM_EMAIL = os.getenv("OTP_FROM_EMAIL", FROM_EMAIL) 
 
-FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@superwiseemails.site")
-OTP_FROM_EMAIL = os.getenv("OTP_FROM_EMAIL", FROM_EMAIL)  # falls back to FROM_EMAIL if not set
-RECEIVER_EMAIL = os.getenv("RECEIVER_EMAIL", "wajahathaider12345@gmail.com")
-
-# --- Gmail IMAP (inbound reply tracking only — NOT used for sending anymore) ---
-IMAP_HOST = os.getenv("IMAP_HOST", "imap.gmail.com")
+IMAP_HOST = os.getenv("IMAP_HOST", "imap.gmail.com") 
 IMAP_USER = os.getenv("IMAP_USER")
 IMAP_PASSWORD = os.getenv("IMAP_PASSWORD")
 
@@ -46,6 +57,7 @@ OTP_EXPIRY_MINUTES = 10
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# (Pydantic Models remain the same below this...)
 # --- Pydantic Models ---
 class LoginRequest(BaseModel):
     email: str
@@ -265,12 +277,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Internal Email System API", lifespan=lifespan)
 
-origins = [
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "https://superwiseemails.site",
-    "https://www.superwiseemails.site",
-]
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+raw_origins = os.getenv("ALLOWED_ORIGINS")
+if raw_origins:
+    origins = [origin.strip() for origin in raw_origins.split(",")]
+else:
+    # Absolute strict fallback to prevent local dev ports from accessing production
+    origins = ["https://superwiseemails.site", "https://www.superwiseemails.site"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -282,7 +298,8 @@ app.add_middleware(
 
 # --- Authentication Endpoints ---
 @app.post("/api/login")
-async def login(credentials: LoginRequest):
+@limiter.limit("5/minute")
+async def login(request: Request, credentials: LoginRequest):
     response = supabase.table("profiles").select("*").eq("email", credentials.email).execute()
     if not response.data:
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -308,7 +325,8 @@ async def login(credentials: LoginRequest):
 
 
 @app.post("/api/forgot-password")
-async def forgot_password(payload: ForgotPasswordRequest, background_tasks: BackgroundTasks):
+@limiter.limit("3/minute") # Prevent email spamming
+async def forgot_password(request: Request, payload: ForgotPasswordRequest, background_tasks: BackgroundTasks):
     # Always return the same generic response, whether or not the email exists —
     # this prevents attackers from using this endpoint to discover valid accounts.
     generic_response = {"message": "If an account with that email exists, a reset code has been sent."}
@@ -385,12 +403,18 @@ async def change_password(payload: ChangePasswordRequest, current_user: dict = D
 
 # --- Email Endpoints ---
 @app.get("/api/emails")
-async def get_emails(user: dict = Depends(get_current_user)):
+async def get_emails(
+    limit: int = 20, 
+    offset: int = 0, 
+    user: dict = Depends(get_current_user)
+):
     query = supabase.table("email_logs").select("*, profiles!inner(name, email)")
     if user["role"] == "employee":
         query = query.eq("user_id", user["id"])
-    response = query.order("created_at", desc=True).execute()
-
+    
+    # Apply pagination and sorting
+    response = query.order("created_at", desc=True).range(offset, offset + limit - 1).execute()
+    
     formatted_data = []
     for log in response.data:
         log["sender_name"] = log["profiles"]["name"]
@@ -399,9 +423,11 @@ async def get_emails(user: dict = Depends(get_current_user)):
     return formatted_data
 
 @app.post("/api/emails/send")
+@limiter.limit("10/minute") 
 async def send_email(
-    payload: EmailSendRequest,
-    background_tasks: BackgroundTasks,
+    request: Request,
+    payload: EmailSendRequest, 
+    background_tasks: BackgroundTasks, 
     user: dict = Depends(get_current_user)
 ):
     log_data = {

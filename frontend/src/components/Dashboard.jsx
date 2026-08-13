@@ -21,14 +21,27 @@ export default function Dashboard({ auth, setAuth }) {
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null); 
+  const [page, setPage] = useState(0);
+  const pageSize = 20;
 
   const fetchLogs = async () => {
     try {
       const baseUrl = import.meta.env.VITE_API_URL || '';
-      const res = await fetch(`${baseUrl}/api/emails`, { headers: { Authorization: `Bearer ${access_token}` } });
+      const offset = page * pageSize;
+      const res = await fetch(`${baseUrl}/api/emails?limit=${pageSize}&offset=${offset}`, { 
+        headers: { Authorization: `Bearer ${access_token}` } 
+      });
       if (res.ok) setLogs(await res.json());
     } catch (err) { console.error('Failed to fetch logs', err); }
   };
+
+  useEffect(() => {
+    if (activeTab === 'emails') {
+      fetchLogs();
+    } else {
+      fetchUsers();
+    }
+  }, [activeTab, page]); // Re-fetch when the page changes
 
   const fetchUsers = async () => {
     if (user.role !== 'admin') return;
@@ -266,6 +279,23 @@ export default function Dashboard({ auth, setAuth }) {
                     )}
                   </tbody>
                 </table>
+                <div className="flex items-center justify-between px-2 pt-4">
+              <button
+                onClick={() => setPage((prev) => Math.max(prev - 1, 0))}
+                disabled={page === 0}
+                className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 disabled:opacity-40 transition-colors"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-slate-500 font-medium">Page {page + 1}</span>
+              <button
+                onClick={() => setPage((prev) => prev + 1)}
+                disabled={logs.length < pageSize}
+                className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 disabled:opacity-40 transition-colors"
+              >
+                Next
+              </button>
+            </div>
               </div>
             </div>
           </div>
@@ -345,6 +375,6 @@ export default function Dashboard({ auth, setAuth }) {
         />
       )}
     </div>
-    
+
   );
 }
