@@ -6,8 +6,8 @@ export default function EmailModal({ token, userRole, onClose, onSuccess }) {
   const [comments, setComments] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const senderEmail = 'system@internal.app';
-  const receiverEmail = 'inbox@internal.app';
+  const senderEmail = 'nabeel@superwise.site';
+  const receiverEmail = 'claims@mjvlaw.co.uk';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -34,7 +34,7 @@ export default function EmailModal({ token, userRole, onClose, onSuccess }) {
     }
   };
 
-  
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white rounded-2xl shadow-2xl border border-blue-100 w-full max-w-lg overflow-hidden transform transition-all animate-in zoom-in-95 duration-200">

@@ -126,7 +126,7 @@ export default function Dashboard({ auth, setAuth }) {
             <div className="flex flex-col justify-center">
               <img src="/logo.png" alt="Logo" className="h-8 w-auto object-contain" onError={(e) => e.target.style.display = 'none'} />
               <span className="text-[10px] font-semibold text-slate-400 tracking-wider uppercase mt-0.5">
-                Superwise Telecoms
+                Superwise International
               </span>
             </div>
 

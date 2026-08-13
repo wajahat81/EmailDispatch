@@ -71,7 +71,7 @@ export default function Login({ setAuth }) {
         {/* Heading */}
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold text-center mt-0">
-            Superwise Telecoms
+            Superwise International
           </h2>
 
           <p className="text-sm text-slate-500 mt-2">
