@@ -12,12 +12,20 @@ export default function Login({ setAuth }) {
     setLoading(true);
     setError('');
     try {
-      const baseUrl = import.meta.env.VITE_API_URL || '';
-const res = await fetch(`${baseUrl}/api/login`, {
+      const formData = new URLSearchParams();
+formData.append('username', email); 
+formData.append('password', password);
+
+// 2. Send the request
+const baseUrl = import.meta.env.VITE_API_URL || '';
+const response = await fetch(`${baseUrl}/api/login`, {
   method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
+  headers: {
+    // This exact header is required by FastAPI
+    'Content-Type': 'application/x-www-form-urlencoded', 
+  },
+  body: formData // Send the formData object, NOT JSON.stringify()
+});
       const data = await res.json();
       
       if (res.ok) {
