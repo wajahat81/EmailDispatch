@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { LogOut, Plus, ShieldCheck, User as UserIcon, MessageSquare, UserPlus, Edit2, Trash2, Search, Calendar, XCircle, KeyRound } from 'lucide-react';
 import EmailModal from './EmailModal';
 import AddUserModal from './AddUserModal';
@@ -24,6 +24,37 @@ export default function Dashboard({ auth, setAuth }) {
   const [page, setPage] = useState(0);
   const pageSize = 20;
 
+  // --- 15-MINUTE INACTIVITY TRACKER ---
+  const timeoutRef = useRef(null);
+
+  const handleInactivityLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setAuth(null);
+  };
+
+  const resetTimer = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    
+    timeoutRef.current = setTimeout(() => {
+      handleInactivityLogout();
+    }, 15 * 60 * 1000); 
+  };
+
+  useEffect(() => {
+    const activityEvents = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    
+    activityEvents.forEach(event => window.addEventListener(event, resetTimer));
+    
+    resetTimer();
+
+    return () => {
+      activityEvents.forEach(event => window.removeEventListener(event, resetTimer));
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+  // ------------------------------------
+
   const fetchLogs = async () => {
     try {
       const baseUrl = import.meta.env.VITE_API_URL || '';
@@ -41,7 +72,7 @@ export default function Dashboard({ auth, setAuth }) {
     } else {
       fetchUsers();
     }
-  }, [activeTab, page]); // Re-fetch when the page changes
+  }, [activeTab, page]); 
 
   const fetchUsers = async () => {
     if (user.role !== 'admin') return;
