@@ -108,7 +108,23 @@ export default function Dashboard({ auth, setAuth }) {
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           
           <div className="flex items-center gap-6">
-            <img src="/logo.png" alt="Logo" className="h-8 w-auto object-contain" onError={(e) => e.target.style.display = 'none'} />
+            <div className="flex flex-col justify-center">
+              <img src="/logo.png" alt="Logo" className="h-8 w-auto object-contain" onError={(e) => e.target.style.display = 'none'} />
+              <span className="text-[10px] font-semibold text-slate-400 tracking-wider uppercase mt-0.5">
+                Superwise Telecoms
+              </span>
+            </div>
+
+            <div className="hidden sm:flex items-center gap-2 pl-1">
+              <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center">
+                <UserIcon className="w-4 h-4 text-blue-600" />
+              </div>
+              <div className="leading-tight">
+                <div className="text-sm font-semibold text-slate-800">{user.name}</div>
+                <div className="text-[11px] text-slate-400 capitalize">{user.role}</div>
+              </div>
+            </div>
+
             <div className="h-6 w-px bg-slate-200 hidden sm:block"></div>
             
             {user.role === 'admin' ? (
