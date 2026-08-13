@@ -11,24 +11,20 @@ export default function Login({ setAuth }) {
     e.preventDefault();
     setLoading(true);
     setError('');
+    
     try {
-      const formData = new URLSearchParams();
-formData.append('username', email); 
-formData.append('password', password);
-
-// 2. Send the request
-const baseUrl = import.meta.env.VITE_API_URL || '';
-const response = await fetch(`${baseUrl}/api/login`, {
-  method: 'POST',
-  headers: {
-    // This exact header is required by FastAPI
-    'Content-Type': 'application/x-www-form-urlencoded', 
-  },
-  body: formData // Send the formData object, NOT JSON.stringify()
-});
-      const data = await res.json();
+      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${baseUrl}/api/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: email, password: password }) 
+      });
       
-      if (res.ok) {
+      const data = await response.json();
+      
+      if (response.ok) {
         localStorage.setItem('token', data.access_token);
         localStorage.setItem('user', JSON.stringify(data.user));
         setAuth(data);
@@ -48,9 +44,9 @@ const response = await fetch(`${baseUrl}/api/login`, {
         
         <div className="flex justify-center mb-6">
           <img 
-  src="/logo.png" 
-  alt="Superwise Logo" 
-  className="h-24 w-auto mx-auto mb-1" 
+            src="/logo.png" 
+            alt="Superwise Logo" 
+            className="h-24 w-auto mx-auto mb-1" 
             onError={(e) => {
               e.target.style.display = 'none';
               e.target.insertAdjacentHTML('afterend', '<div class="h-12 w-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 font-bold text-xl">L</div>');
@@ -60,8 +56,8 @@ const response = await fetch(`${baseUrl}/api/login`, {
 
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold text-center mt-0">
-  Superwise Telecoms
-</h2>
+            Superwise Telecoms
+          </h2>
           <p className="text-sm text-slate-500 mt-2">Please Enter your credentials</p>
         </div>
 

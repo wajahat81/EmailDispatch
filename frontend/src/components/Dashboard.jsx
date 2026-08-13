@@ -8,16 +8,13 @@ import ConfirmModal from './ConfirmModal';
 export default function Dashboard({ auth, setAuth }) {
   const { user, access_token } = auth;
   
-  // Navigation & Data States
   const [activeTab, setActiveTab] = useState('emails'); 
   const [logs, setLogs] = useState([]);
   const [usersList, setUsersList] = useState([]);
   
-  // Filter States (New)
   const [filterDate, setFilterDate] = useState('');
   const [filterSender, setFilterSender] = useState('');
   
-  // Modal States
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -25,7 +22,8 @@ export default function Dashboard({ auth, setAuth }) {
 
   const fetchLogs = async () => {
     try {
-      const res = await fetch('/api/emails', { headers: { Authorization: `Bearer ${access_token}` } });
+      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${baseUrl}/api/emails`, { headers: { Authorization: `Bearer ${access_token}` } });
       if (res.ok) setLogs(await res.json());
     } catch (err) { console.error('Failed to fetch logs', err); }
   };
@@ -33,7 +31,8 @@ export default function Dashboard({ auth, setAuth }) {
   const fetchUsers = async () => {
     if (user.role !== 'admin') return;
     try {
-      const res = await fetch('/api/admin/users', { headers: { Authorization: `Bearer ${access_token}` } });
+      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${baseUrl}/api/admin/users`, { headers: { Authorization: `Bearer ${access_token}` } });
       if (res.ok) setUsersList(await res.json());
     } catch (err) { console.error('Failed to fetch users', err); }
   };
@@ -73,7 +72,8 @@ export default function Dashboard({ auth, setAuth }) {
       isDestructive: true,
       onConfirm: async () => {
         try {
-          await fetch(`/api/admin/users/${userId}`, {
+          const baseUrl = import.meta.env.VITE_API_URL || '';
+          await fetch(`${baseUrl}/api/admin/users/${userId}`, {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${access_token}` }
           });
@@ -86,13 +86,11 @@ export default function Dashboard({ auth, setAuth }) {
     });
   };
 
-  // --- Filter Logic ---
   const filteredLogs = logs.filter((log) => {
     let matchesDate = true;
     let matchesSender = true;
 
     if (filterDate) {
-      // Convert database timestamp to YYYY-MM-DD for comparison
       const logDate = new Date(log.created_at).toISOString().split('T')[0];
       matchesDate = logDate === filterDate;
     }
@@ -155,11 +153,9 @@ export default function Dashboard({ auth, setAuth }) {
 
       <main className="max-w-6xl mx-auto px-4 py-8">
         
-        {/* VIEW 1: EMAILS */}
         {activeTab === 'emails' && (
           <div className="space-y-4">
             
-            {/* Filter Bar (Admin Only) */}
             {user.role === 'admin' && (
               <div className="bg-white p-4 rounded-2xl shadow-sm border border-blue-50 flex flex-wrap gap-4 items-end animate-in fade-in">
                 
@@ -250,7 +246,6 @@ export default function Dashboard({ auth, setAuth }) {
           </div>
         )}
 
-        {/* VIEW 2: USERS (Admin Only) */}
         {activeTab === 'users' && user.role === 'admin' && (
           <div className="bg-white rounded-2xl shadow-sm border border-indigo-50 overflow-hidden">
             <table className="w-full text-left text-sm">
@@ -299,7 +294,6 @@ export default function Dashboard({ auth, setAuth }) {
 
       </main>
 
-      {/* --- MODALS --- */}
       {isEmailModalOpen && (
         <EmailModal token={access_token} userRole={user.role} onClose={() => setIsEmailModalOpen(false)} onSuccess={() => { setIsEmailModalOpen(false); fetchLogs(); }} />
       )}
@@ -312,7 +306,6 @@ export default function Dashboard({ auth, setAuth }) {
         <EditUserModal token={access_token} userToEdit={editingUser} onClose={() => setEditingUser(null)} setConfirmAction={setConfirmAction} onSuccess={() => { setEditingUser(null); setConfirmAction(null); fetchUsers(); }} />
       )}
 
-      {/* GLOBAL CONFIRMATION OVERLAY */}
       {confirmAction && (
         <ConfirmModal
           title={confirmAction.title}

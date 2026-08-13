@@ -13,7 +13,8 @@ export default function EmailModal({ token, userRole, onClose, onSuccess }) {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch('/api/emails/send', {
+      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${baseUrl}/api/emails/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -5,7 +5,7 @@ export default function EditUserModal({ token, userToEdit, onClose, onSuccess, s
   const [formData, setFormData] = useState({
     name: userToEdit.name,
     email: userToEdit.email,
-    password: '', // Leave blank unless they want to change it
+    password: '', 
     role: userToEdit.role
   });
   const [loading, setLoading] = useState(false);
@@ -15,7 +15,8 @@ export default function EditUserModal({ token, userToEdit, onClose, onSuccess, s
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`/api/admin/users/${userToEdit.id}`, {
+      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${baseUrl}/api/admin/users/${userToEdit.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

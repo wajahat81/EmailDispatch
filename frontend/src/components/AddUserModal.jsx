@@ -10,7 +10,8 @@ export default function AddUserModal({ token, onClose, onSuccess, setConfirmActi
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/admin/users', {
+      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${baseUrl}/api/admin/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(formData),
