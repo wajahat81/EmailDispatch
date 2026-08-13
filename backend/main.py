@@ -211,9 +211,9 @@ async def email_sync_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    task = asyncio.create_task(email_sync_loop())
+    #task = asyncio.create_task(email_sync_loop())
     yield
-    task.cancel()
+    #task.cancel()
 
 app = FastAPI(title="Internal Email System API", lifespan=lifespan)
 
