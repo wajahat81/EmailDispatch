@@ -30,6 +30,9 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
+
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 # --- 2. Zero-Fallback Secrets Management ---
 def get_env_or_fail(var_name: str) -> str:
     value = os.getenv(var_name)
