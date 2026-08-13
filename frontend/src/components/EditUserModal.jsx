@@ -96,5 +96,6 @@ export default function EditUserModal({ token, userToEdit, onClose, onSuccess, s
         </form>
       </div>
     </div>
+    
   );
 }

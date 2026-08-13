@@ -81,6 +81,7 @@ export default function AddUserModal({ token, onClose, onSuccess, setConfirmActi
           </div>
         </form>
       </div>
+      
     </div>
   );
 }

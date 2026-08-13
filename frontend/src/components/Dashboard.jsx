@@ -345,5 +345,6 @@ export default function Dashboard({ auth, setAuth }) {
         />
       )}
     </div>
+    
   );
 }

@@ -9,6 +9,7 @@ export default function Login({ setAuth }) {
   const [error, setError] = useState('');
   const [view, setView] = useState('login'); // 'login' | 'forgot'
 
+  
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);

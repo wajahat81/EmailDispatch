@@ -110,6 +110,7 @@ export default function ForgotPassword({ onBack }) {
                   />
                 </div>
               </div>
+              
               <button
                 type="submit"
                 disabled={loading}

@@ -32,6 +32,7 @@ export default function ConfirmModal({ title, message, onConfirm, onCancel, isDe
           >
             Yes, Confirm
           </button>
+          
         </div>
 
       </div>

@@ -134,6 +134,7 @@ export default function ChangePasswordModal({ token, onClose }) {
               onClick={onClose}
               className="w-full bg-gradient-to-r from-blue-600 to-blue-500 text-white font-medium py-2.5 rounded-xl hover:from-blue-700 hover:to-blue-600 transition-all duration-200"
             >
+                
               Done
             </button>
           </div>
