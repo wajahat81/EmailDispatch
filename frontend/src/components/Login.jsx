@@ -9,24 +9,27 @@ export default function Login({ setAuth }) {
   const [error, setError] = useState('');
   const [view, setView] = useState('login'); // 'login' | 'forgot'
 
-  
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    
+
     try {
       const baseUrl = import.meta.env.VITE_API_URL || '';
+
       const response = await fetch(`${baseUrl}/api/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email: email, password: password }) 
+        body: JSON.stringify({
+          email: email,
+          password: password,
+        }),
       });
-      
+
       const data = await response.json();
-      
+
       if (response.ok) {
         localStorage.setItem('token', data.access_token);
         localStorage.setItem('user', JSON.stringify(data.user));
@@ -48,37 +51,53 @@ export default function Login({ setAuth }) {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 via-white to-blue-100 font-sans">
       <div className="max-w-sm w-full bg-white/80 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-blue-100 p-8 transition-all">
-        
+
+        {/* Logo */}
         <div className="flex justify-center mb-6">
-          <img 
-            src="/logo.png" 
-            alt="Superwise Logo" 
-            className="h-24 w-auto mx-auto mb-1" 
+          <img
+            src="/logo.png"
+            alt="Superwise Logo"
+            className="h-24 w-auto mx-auto mb-1"
             onError={(e) => {
               e.target.style.display = 'none';
-              e.target.insertAdjacentHTML('afterend', '<div class="h-12 w-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 font-bold text-xl">L</div>');
+              e.target.insertAdjacentHTML(
+                'afterend',
+                '<div class="h-12 w-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 font-bold text-xl">L</div>'
+              );
             }}
           />
         </div>
 
+        {/* Heading */}
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold text-center mt-0">
             Superwise Telecoms
           </h2>
-          <p className="text-sm text-slate-500 mt-2">Please Enter your credentials</p>
+
+          <p className="text-sm text-slate-500 mt-2">
+            Please Enter your credentials
+          </p>
         </div>
 
+        {/* Error */}
         {error && (
           <div className="mb-5 p-3 text-sm text-red-700 bg-red-50 rounded-xl border border-red-100 animate-in fade-in slide-in-from-top-2">
             {error}
           </div>
         )}
 
+        {/* Login Form */}
         <form onSubmit={handleLogin} className="space-y-5">
+
+          {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              Email
+            </label>
+
             <div className="relative group">
               <Mail className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+
               <input
                 type="email"
                 required
@@ -89,19 +108,16 @@ export default function Login({ setAuth }) {
               />
             </div>
           </div>
+
+          {/* Password */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-sm font-medium text-slate-700">Password</label>
-              <button
-                type="button"
-                onClick={() => setView('forgot')}
-                className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline"
-              >
-                Forgot password?
-              </button>
-            </div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              Password
+            </label>
+
             <div className="relative group">
               <Lock className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+
               <input
                 type="password"
                 required
@@ -111,7 +127,20 @@ export default function Login({ setAuth }) {
                 placeholder="••••••••"
               />
             </div>
+
+            {/* Forgot Password - Below Password & Right Aligned */}
+            <div className="flex justify-end mt-2">
+              <button
+                type="button"
+                onClick={() => setView('forgot')}
+                className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline"
+              >
+                Forgot password?
+              </button>
+            </div>
           </div>
+
+          {/* Sign In Button */}
           <button
             type="submit"
             disabled={loading}
@@ -119,8 +148,9 @@ export default function Login({ setAuth }) {
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
+
         </form>
       </div>
     </div>
   );
-}
+} 
