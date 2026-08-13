@@ -23,8 +23,10 @@ load_dotenv()
 # --- Environment Variables ---
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-SENDER_EMAIL = os.getenv("SENDER_EMAIL", "wajibhai239@gmail.com")
-RECEIVER_EMAIL = os.getenv("RECEIVER_EMAIL", "wajahathaider12345@gmail.com")
+SENDER_EMAIL = "wajibhai239@gmail.com"
+RECEIVER_EMAIL = "wajahathaider12345@gmail.com"
+SMTP_USER = "wajibhai239@gmail.com"
+SMTP_PASSWORD = "ffshrxzfjzkmnwdq"
 JWT_SECRET = os.getenv("JWT_SECRET", "68e0002a-f9db-48f6-8f91-daaf5ca8afa5")
 
 SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
