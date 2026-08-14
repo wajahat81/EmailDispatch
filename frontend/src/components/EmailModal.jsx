@@ -6,7 +6,7 @@ export default function EmailModal({ token, userRole, onClose, onSuccess }) {
   const [comments, setComments] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const senderEmail = 'nabeel@superwise.site';
+  const senderEmail = 'nabeel@superwiseemails.site';
   const receiverEmail = 'claims@mjvlaw.co.uk';
 
   const handleSubmit = async (e) => {
