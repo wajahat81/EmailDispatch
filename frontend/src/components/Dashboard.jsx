@@ -9,7 +9,13 @@ import ChangePasswordModal from './ChangePasswordModal';
 export default function Dashboard({ auth, setAuth }) {
   const { user, access_token } = auth;
   
-  const [activeTab, setActiveTab] = useState('emails'); 
+  const [activeTab, setActiveTab] = useState(() => {
+    return sessionStorage.getItem('currentTab') || 'emails';
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem('currentTab', activeTab);
+  }, [activeTab]);
   const [logs, setLogs] = useState([]);
   const [usersList, setUsersList] = useState([]);
   
@@ -36,6 +42,7 @@ export default function Dashboard({ auth, setAuth }) {
   const resetTimer = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     
+    // Set timer for 15 minutes (15 * 60 * 1000)
     timeoutRef.current = setTimeout(() => {
       handleInactivityLogout();
     }, 15 * 60 * 1000); 
@@ -310,23 +317,23 @@ export default function Dashboard({ auth, setAuth }) {
                     )}
                   </tbody>
                 </table>
-                <div className="flex items-center justify-between px-2 pt-4">
-              <button
-                onClick={() => setPage((prev) => Math.max(prev - 1, 0))}
-                disabled={page === 0}
-                className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 disabled:opacity-40 transition-colors"
-              >
-                Previous
-              </button>
-              <span className="text-sm text-slate-500 font-medium">Page {page + 1}</span>
-              <button
-                onClick={() => setPage((prev) => prev + 1)}
-                disabled={logs.length < pageSize}
-                className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 disabled:opacity-40 transition-colors"
-              >
-                Next
-              </button>
-            </div>
+                <div className="flex items-center justify-between px-2 pt-4 pb-4">
+                  <button
+                    onClick={() => setPage((prev) => Math.max(prev - 1, 0))}
+                    disabled={page === 0}
+                    className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 disabled:opacity-40 transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-sm text-slate-500 font-medium">Page {page + 1}</span>
+                  <button
+                    onClick={() => setPage((prev) => prev + 1)}
+                    disabled={logs.length < pageSize}
+                    className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 disabled:opacity-40 transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -406,6 +413,5 @@ export default function Dashboard({ auth, setAuth }) {
         />
       )}
     </div>
-
   );
 }
