@@ -60,7 +60,6 @@ OTP_EXPIRY_MINUTES = 10
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# (Pydantic Models remain the same below this...)
 # --- Pydantic Models ---
 class LoginRequest(BaseModel):
     email: str
@@ -135,27 +134,26 @@ def send_otp_email(to_email: str, otp: str):
         })
         return True
     except Exception as e:
-        print(f"Failed to send OTP email: {e}")
+        logger.error(f"Failed to send OTP email: {e}")
         return False
 
 def dispatch_actual_email(sender: str, receiver: str, subject: str, body: str, log_id: str):
-    if not IMAP_USER:
-        print("IMAP_USER not set — replies won't be trackable via Reply-To")
-        reply_to_email = sender
-    else:
-        imap_name, imap_domain = IMAP_USER.split('@')
-        reply_to_email = f"{imap_name}+{log_id}@{imap_domain}"
+    # Option 1: Use the standard email without the '+' trick
+    reply_to_email = IMAP_USER if IMAP_USER else sender
+    
+    # Inject the tracking ID into the subject line
+    tracked_subject = f"{subject} [REF:{log_id}]"
 
     try:
         resend.Emails.send({
             "from": sender,
             "to": [receiver],
-            "subject": subject,
+            "subject": tracked_subject,
             "text": body,
             "reply_to": reply_to_email,
         })
     except Exception as e:
-        print(f"Resend send failed: {str(e)}")
+        logger.error(f"Resend send failed: {str(e)}")
 
 def clean_email_body(raw_body):
     body = raw_body.replace('\r', '')
@@ -212,10 +210,10 @@ def extract_body(msg):
     return ""
 
 
-# --- Automated Background Sync Logic (Gmail IMAP) ---
+# --- Automated Background Sync Logic (Option 1: Subject Tracking) ---
 def sync_imap_emails():
     if not IMAP_USER or not IMAP_PASSWORD:
-        print("IMAP credentials not set — skipping reply sync")
+        logger.warning("IMAP credentials not set — skipping reply sync")
         return
     try:
         mail = imaplib.IMAP4_SSL(IMAP_HOST)
@@ -235,14 +233,13 @@ def sync_imap_emails():
                 if isinstance(response_part, tuple):
                     msg = email.message_from_bytes(response_part[1])
 
-                    to_header = str(msg.get("To", ""))
-                    match = re.search(r"\+([a-f0-9\-]+)@", to_header)
-
-                    if not match:
-                        subject, encoding = decode_header(msg.get("Subject", ""))[0]
-                        if isinstance(subject, bytes):
-                            subject = subject.decode(encoding if encoding else "utf-8")
-                        match = re.search(r"\[REF:([a-f0-9\-]+)\]", subject)
+                    # Extract and decode the subject line
+                    subject, encoding = decode_header(msg.get("Subject", ""))[0]
+                    if isinstance(subject, bytes):
+                        subject = subject.decode(encoding if encoding else "utf-8")
+                    
+                    # Regex to find the [REF:id] in the subject
+                    match = re.search(r"\[REF:([a-f0-9\-]+)\]", subject)
 
                     if match:
                         log_id = match.group(1)
@@ -259,13 +256,21 @@ def sync_imap_emails():
                             else:
                                 combined_response = clean_body
 
-                            supabase.table("email_logs").update({
-                                "response_text": combined_response[:10000]
-                            }).eq("id", log_id).execute()
+                            try:
+                                supabase.table("email_logs").update({
+                                    "response_text": combined_response[:10000],
+                                    "status": "replied"
+                                }).eq("id", log_id).execute()
+                                logger.info(f"Successfully tracked reply for log: {log_id}")
+                            except Exception as db_err:
+                                logger.error(f"Failed to update database for log {log_id}: {db_err}")
+                    else:
+                        # Log if the subject is missing the reference tag
+                        logger.warning(f"Incoming email ignored. No valid REF tag found in subject: '{subject}'")
 
         mail.logout()
     except Exception as e:
-        print(f"Background IMAP Sync Error: {e}")
+        logger.error(f"Background IMAP Sync Error: {e}")
 
 async def email_sync_loop():
     while True:

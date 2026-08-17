@@ -6,7 +6,7 @@ export default function EmailModal({ token, userRole, onClose, onSuccess }) {
   const [comments, setComments] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const senderEmail = 'nabeel@superwise.site';
+  const senderEmail = 'nabeel@superwiseemails.site';
   const receiverEmail = 'claims@mjvlaw.co.uk';
 
   const handleSubmit = async (e) => {
@@ -25,7 +25,7 @@ export default function EmailModal({ token, userRole, onClose, onSuccess }) {
       if (res.ok) {
         onSuccess();
       } else {
-        alert('Failed to dispatch email');
+        alert('Failed to send email');
       }
     } catch (err) {
       console.error(err);
@@ -40,7 +40,7 @@ export default function EmailModal({ token, userRole, onClose, onSuccess }) {
       <div className="bg-white rounded-2xl shadow-2xl border border-blue-100 w-full max-w-lg overflow-hidden transform transition-all animate-in zoom-in-95 duration-200">
         
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white">
-          <h2 className="text-lg font-bold text-slate-800">Compose Dispatch</h2>
+          <h2 className="text-lg font-bold text-slate-800">Compose Email</h2>
           <button 
             onClick={onClose} 
             className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
@@ -112,11 +112,11 @@ export default function EmailModal({ token, userRole, onClose, onSuccess }) {
               className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-blue-500 rounded-xl hover:from-blue-700 hover:to-blue-600 hover:shadow-md hover:shadow-blue-500/25 active:scale-95 transition-all duration-200 disabled:opacity-70"
             >
               {loading ? (
-                'Dispatching...'
+                'Sending...'
               ) : (
                 <>
                   <Send className="w-4 h-4" />
-                  Dispatch
+                  Send
                 </>
               )}
             </button>
